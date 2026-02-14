@@ -26,14 +26,14 @@ MyBatis の Interceptor 機構を利用して、SQL 実行後に `EXPLAIN` を�
 <dependency>
   <groupId>io.github.naka-sho</groupId>
   <artifactId>mybatis-explain-plugin</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'io.github.naka-sho:mybatis-explain-plugin:1.0.0'
+implementation 'io.github.naka-sho:mybatis-explain-plugin:1.0.1'
 ```
 
 ## 設定

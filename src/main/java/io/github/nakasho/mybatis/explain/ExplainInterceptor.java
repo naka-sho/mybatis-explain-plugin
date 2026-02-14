@@ -51,6 +51,13 @@ import org.apache.ibatis.session.RowBounds;
 })
 public class ExplainInterceptor implements Interceptor {
 
+  /**
+   * Creates a new interceptor instance.
+   */
+  public ExplainInterceptor() {
+    // default constructor
+  }
+
   @Override
   public Object intercept(Invocation invocation) throws Throwable {
     Object proceed = invocation.proceed();
