@@ -7,8 +7,10 @@ MyBatis の Interceptor 機構を利用して、SQL 実行後に `EXPLAIN` を�
 ## 特徴
 
 - `Executor.query` および `Executor.update` をインターセプトし、実行後に `EXPLAIN <SQL>` を実行
+- `MappedStatement.getDatabaseId()` に基づいてデータベースごとの EXPLAIN 構文を自動選択
 - MyBatis の `statementLog` を利用してマッパー単位でログ出力（ログレベル: DEBUG）
 - `CALLABLE` ステートメントは自動スキップ
+- EXPLAIN 非対応 DB（SQL Server 等）は自動的にスキップ
 - EXPLAIN 実行に失敗しても元のクエリには影響しない
 - Spring 非依存 — 素の MyBatis でも Spring Boot でも利用可能
 
@@ -16,7 +18,7 @@ MyBatis の Interceptor 機構を利用して、SQL 実行後に `EXPLAIN` を�
 
 - Java 11+
 - MyBatis 3.5.x+
-- `EXPLAIN` 構文をサポートするデータベース（PostgreSQL, MySQL, H2 など）
+- `EXPLAIN` 構文をサポートするデータベース（PostgreSQL, MySQL, Oracle, H2 など）
 
 ## インストール
 
@@ -26,14 +28,14 @@ MyBatis の Interceptor 機構を利用して、SQL 実行後に `EXPLAIN` を�
 <dependency>
   <groupId>io.github.naka-sho</groupId>
   <artifactId>mybatis-explain-plugin</artifactId>
-  <version>1.0.1</version>
+  <version>1.0.2</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'io.github.naka-sho:mybatis-explain-plugin:1.0.1'
+implementation 'io.github.naka-sho:mybatis-explain-plugin:1.0.2'
 ```
 
 ## 設定
@@ -75,7 +77,11 @@ logging:
 
 ## 仕組み
 
-- `Executor.query`/`Executor.update` の実行後に `EXPLAIN <SQL>` を発行します
+- `Executor.query`/`Executor.update` の実行後に EXPLAIN を発行します
+- `MappedStatement.getDatabaseId()` を参照し、データベースに応じた EXPLAIN プレフィックスを選択します
+  - デフォルト: `EXPLAIN <SQL>`
+  - Oracle: `EXPLAIN PLAN FOR <SQL>`
+  - SQL Server: EXPLAIN 非対応のためスキップ
 - `statementLog` が DEBUG の場合のみ EXPLAIN を実行します
 - バインドパラメータは元 SQL と同じ値を利用します
 - EXPLAIN 実行時の例外は DEBUG に出力し、元のクエリには影響しません
@@ -109,27 +115,27 @@ logging:
 
 ## 対応データベース
 
-本プラグインは `EXPLAIN <SQL>` をそのまま発行します。この構文をサポートするデータベースで動作します。
+`MappedStatement.getDatabaseId()` に基づいてデータベースごとの EXPLAIN 構文を自動選択します。
 
-| データベース | 対応 | 出力形式 | 備考 |
-|---|---|---|---|
-| PostgreSQL | o | テキスト（単一カラム） | `EXPLAIN <SQL>` — ツリー形式の実行計画 |
-| MySQL | o | テーブル（複数カラム） | `EXPLAIN <SQL>` — `id`, `select_type`, `table`, `type` 等 |
-| MariaDB | o | テーブル（複数カラム） | MySQL と同様の形式 |
-| H2 | o | テキスト（単一カラム） | `EXPLAIN <SQL>` — 簡易的な実行計画 |
-| SQLite | o | バイトコード形式 | `EXPLAIN QUERY PLAN <SQL>` ではなく `EXPLAIN <SQL>` を実行 |
-| CockroachDB | o | テキスト（単一カラム） | PostgreSQL 互換 |
-| TiDB | o | テーブル（複数カラム） | MySQL 互換 |
-| Oracle | x | — | `EXPLAIN PLAN FOR` + `DBMS_XPLAN` が必要。`EXPLAIN <SQL>` は非対応 |
-| SQL Server | x | — | `SET SHOWPLAN_XML ON` 等が必要。`EXPLAIN` 構文なし |
-| DB2 | x | — | `EXPLAIN PLAN FOR` が必要。`EXPLAIN <SQL>` は非対応 |
+| データベース | 対応 | EXPLAIN プレフィックス | 出力形式 | 備考 |
+|---|---|---|---|---|
+| PostgreSQL | o | `EXPLAIN ` | テキスト（単一カラム） | ツリー形式の実行計画 |
+| MySQL | o | `EXPLAIN ` | テーブル（複数カラム） | `id`, `select_type`, `table`, `type` 等 |
+| MariaDB | o | `EXPLAIN ` | テーブル（複数カラム） | MySQL と同様の形式 |
+| H2 | o | `EXPLAIN ` | テキスト（単一カラム） | 簡易的な実行計画 |
+| SQLite | o | `EXPLAIN ` | バイトコード形式 | `EXPLAIN QUERY PLAN` ではなく `EXPLAIN` を実行 |
+| CockroachDB | o | `EXPLAIN ` | テキスト（単一カラム） | PostgreSQL 互換 |
+| TiDB | o | `EXPLAIN ` | テーブル（複数カラム） | MySQL 互換 |
+| Oracle | o | `EXPLAIN PLAN FOR ` | — | databaseId=`oracle` で自動切り替え |
+| SQL Server | — | スキップ | — | databaseId=`sqlserver` で EXPLAIN をスキップ |
+| DB2 | x | — | — | `EXPLAIN PLAN FOR` が必要。今後対応予定 |
 
-非対応 DB で使用した場合、EXPLAIN の実行に失敗しますが元のクエリには影響しません（エラーログが出力されるのみ）。
+SQL Server など EXPLAIN 非対応の DB では EXPLAIN がスキップされ、元のクエリのみが実行されます。
 
 ## 注意事項
 
 - 本プラグインは開発・デバッグ用途を想定しています。本番環境では DEBUG ログを無効にするか、依存を除外してください
-- EXPLAIN の構文はデータベースごとに異なります。`EXPLAIN <SQL>` をそのまま発行するため、対象 DB がこの構文をサポートしている必要があります
+- EXPLAIN の構文はデータベースごとに異なります。`databaseId` が未設定の場合は `EXPLAIN <SQL>` をデフォルトで発行します
 - クエリ実行後に EXPLAIN を発行するため、1 クエリあたり追加の DB アクセスが 1 回発生します
 - MyBatis のログ実装（`logImpl`）が無効だと `statementLog` が出力されないため、ログ設定を確認してください
 

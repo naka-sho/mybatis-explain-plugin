@@ -6,7 +6,7 @@
 
   <groupId>io.github.naka-sho</groupId>
   <artifactId>mybatis-explain-plugin</artifactId>
-  <version>1.0.1</version>
+  <version>1.0.2</version>
   <packaging>jar</packaging>
 
   <name>MyBatis Explain Plugin</name>
