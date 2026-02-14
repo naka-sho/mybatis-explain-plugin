@@ -436,6 +436,58 @@ class ExplainInterceptorTest {
   }
 
   @Test
+  @DisplayName("executeExplain: Oracle databaseId uses EXPLAIN PLAN FOR prefix")
+  void executeExplainShouldUseOraclePrefix() throws Exception {
+    Log log = mock(Log.class);
+
+    ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+    when(metaData.getColumnCount()).thenReturn(1);
+
+    ResultSet rs = mock(ResultSet.class);
+    when(rs.next()).thenReturn(true, false);
+    when(rs.getString(1)).thenReturn("OraclePlan");
+    when(rs.getMetaData()).thenReturn(metaData);
+
+    PreparedStatement pstmt = mock(PreparedStatement.class);
+    when(pstmt.executeQuery()).thenReturn(rs);
+
+    Connection conn = mock(Connection.class);
+    when(conn.prepareStatement(anyString())).thenReturn(pstmt);
+
+    Executor executor = newMockExecutor(conn);
+
+    Configuration config = sqlSessionFactory.getConfiguration();
+    MappedStatement realMs = config.getMappedStatement("io.github.nakasho.mybatis.explain.selectUser");
+    BoundSql boundSql = realMs.getBoundSql(1);
+
+    MappedStatement ms = cloneMsWithLogAndDatabaseId(realMs, log, "oracle");
+
+    new ExplainInterceptor().executeExplain(ms, 1, boundSql, executor);
+
+    verify(conn).prepareStatement("EXPLAIN PLAN FOR " + boundSql.getSql());
+    verify(log).debug("<== ExplainPlan: OraclePlan");
+  }
+
+  @Test
+  @DisplayName("executeExplain: SQL Server databaseId skips EXPLAIN")
+  void executeExplainShouldSkipForSqlServer() throws Exception {
+    Log log = mock(Log.class);
+
+    Executor executor = mock(Executor.class);
+
+    Configuration config = sqlSessionFactory.getConfiguration();
+    MappedStatement realMs = config.getMappedStatement("io.github.nakasho.mybatis.explain.selectUser");
+    BoundSql boundSql = realMs.getBoundSql(1);
+
+    MappedStatement ms = cloneMsWithLogAndDatabaseId(realMs, log, "sqlserver");
+
+    new ExplainInterceptor().executeExplain(ms, 1, boundSql, executor);
+
+    verify(executor, never()).getTransaction();
+    verify(log, never()).debug(anyString());
+  }
+
+  @Test
   @DisplayName("setProperties: accepts Properties")
   void setPropertiesShouldAcceptProperties() {
     new ExplainInterceptor().setProperties(new Properties());
@@ -455,12 +507,17 @@ class ExplainInterceptorTest {
   }
 
   private static MappedStatement cloneMsWithLog(MappedStatement original, Log log) throws Exception {
-    // Build a new MappedStatement from the original configuration, then override statementLog
+    return cloneMsWithLogAndDatabaseId(original, log, null);
+  }
+
+  private static MappedStatement cloneMsWithLogAndDatabaseId(MappedStatement original, Log log, String databaseId)
+      throws Exception {
     Configuration config = original.getConfiguration();
     MappedStatement ms = new MappedStatement.Builder(config,
         original.getId() + ".logOverride." + System.nanoTime(),
         original.getSqlSource(), original.getSqlCommandType())
         .resultMaps(original.getResultMaps())
+        .databaseId(databaseId)
         .build();
     Field field = MappedStatement.class.getDeclaredField("statementLog");
     field.setAccessible(true);

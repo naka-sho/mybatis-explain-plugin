@@ -80,8 +80,13 @@ public class ExplainInterceptor implements Interceptor {
    */
   void executeExplain(MappedStatement ms, Object parameter, BoundSql boundSql, Executor executor) {
     Log statementLog = ms.getStatementLog();
+    DatabaseType databaseType = DatabaseType.fromDatabaseId(ms.getDatabaseId());
+    String explainPrefix = databaseType.getExplainPrefix();
+    if (explainPrefix == null) {
+      return;
+    }
     String sql = boundSql.getSql();
-    String explainSql = "EXPLAIN " + sql;
+    String explainSql = explainPrefix + sql;
     Configuration configuration = ms.getConfiguration();
 
     try {
