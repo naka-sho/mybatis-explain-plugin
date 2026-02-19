@@ -52,15 +52,45 @@ implementation 'io.github.naka-sho:mybatis-explain-plugin:1.0.2'
 
 `@Bean` として登録すると mybatis-spring-boot-starter が自動的にインターセプターとして認識します。
 
+> **⚠ 本番環境での利用について**
+>
+> 本プラグインは開発・デバッグ用途を想定しています。
+> 1 クエリあたり追加の EXPLAIN が発行されるため、本番環境ではBean登録を無効にしてください。
+> `@Profile` やプロパティによる制御を推奨します。
+
+#### Profile で制御する例
+
 ```java
 @Configuration
-public class MyBatisConfig {
+@Profile("dev")
+public class MyBatisDevConfig {
 
     @Bean
     public ExplainInterceptor explainInterceptor() {
         return new ExplainInterceptor();
     }
 }
+```
+
+#### プロパティで制御する例
+
+```java
+@Configuration
+@ConditionalOnProperty(name = "mybatis.explain.enabled", havingValue = "true")
+public class MyBatisExplainConfig {
+
+    @Bean
+    public ExplainInterceptor explainInterceptor() {
+        return new ExplainInterceptor();
+    }
+}
+```
+
+```yaml
+# application-dev.yml
+mybatis:
+  explain:
+    enabled: true
 ```
 
 ### ログレベル
