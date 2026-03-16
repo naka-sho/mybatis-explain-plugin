@@ -117,11 +117,19 @@ class LogParser:
                 entry.explain_lines.append(pm.group(1))
 
     def flush(self) -> List[QueryEntry]:
-        """残った保留エントリをすべてフラッシュして完了リストを返す。"""
+        """残った保留エントリをすべてフラッシュし、(queryId, sql) 重複を除いて返す。"""
         for entry in self._pending.values():
             self._completed.append(entry)
         self._pending.clear()
-        return self._completed
+
+        seen: set = set()
+        unique: List[QueryEntry] = []
+        for entry in self._completed:
+            key = (entry.query_id, entry.sql)
+            if key not in seen:
+                seen.add(key)
+                unique.append(entry)
+        return unique
 
 
 # ---------------------------------------------------------------------------

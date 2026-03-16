@@ -81,21 +81,35 @@ class TestLogParser(unittest.TestCase):
     # 同一マッパーへの連続呼び出し
     # ------------------------------------------------------------------
 
-    def test_multiple_calls_same_mapper(self):
-        """同じマッパーが連続して呼ばれた場合に複数エントリを生成する。"""
+    def test_same_query_id_same_sql_deduplication(self):
+        """同じ queryId かつ同じ SQL の場合は重複をスキップして 1 件にまとめる。"""
         lines = [
             "DEBUG com.example.UserMapper.findAll - ==>  Preparing: SELECT * FROM users",
             "DEBUG com.example.UserMapper.findAll - ==> Parameters: ",
-            "DEBUG com.example.UserMapper.findAll - <==      Total: 3",
-            "DEBUG com.example.UserMapper.findAll - <== ExplainPlan: Seq Scan on users  (cost=0.00..1.03 rows=3 width=72)",
-            # 2 回目の呼び出し
+            "DEBUG com.example.UserMapper.findAll - <== ExplainPlan: Seq Scan on users",
+            # 2 回目（同じ SQL）→ スキップされる
             "DEBUG com.example.UserMapper.findAll - ==>  Preparing: SELECT * FROM users",
             "DEBUG com.example.UserMapper.findAll - ==> Parameters: ",
-            "DEBUG com.example.UserMapper.findAll - <==      Total: 3",
-            "DEBUG com.example.UserMapper.findAll - <== ExplainPlan: Seq Scan on users  (cost=0.00..1.03 rows=3 width=72)",
+            "DEBUG com.example.UserMapper.findAll - <== ExplainPlan: Seq Scan on users",
+        ]
+        entries = self._parse(lines)
+        self.assertEqual(len(entries), 1)
+
+    def test_same_query_id_different_sql_kept(self):
+        """同じ queryId でも SQL が異なる場合はどちらも出力する。"""
+        lines = [
+            "DEBUG com.example.UserMapper.findByCondition - ==>  Preparing: SELECT * FROM users WHERE status = ?",
+            "DEBUG com.example.UserMapper.findByCondition - ==> Parameters: active(String)",
+            "DEBUG com.example.UserMapper.findByCondition - <== ExplainPlan: Index Scan on users",
+            # 動的 SQL で WHERE 句が変わった場合
+            "DEBUG com.example.UserMapper.findByCondition - ==>  Preparing: SELECT * FROM users WHERE status = ? AND role = ?",
+            "DEBUG com.example.UserMapper.findByCondition - ==> Parameters: active(String), admin(String)",
+            "DEBUG com.example.UserMapper.findByCondition - <== ExplainPlan: Seq Scan on users",
         ]
         entries = self._parse(lines)
         self.assertEqual(len(entries), 2)
+        self.assertIn("status = ?", entries[0].sql)
+        self.assertIn("role = ?", entries[1].sql)
 
     # ------------------------------------------------------------------
     # 複数の異なるマッパー
