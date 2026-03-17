@@ -493,6 +493,82 @@ class ExplainInterceptorTest {
     new ExplainInterceptor().setProperties(new Properties());
   }
 
+  // --- injectNoFullTableScanHint tests ---
+
+  @Test
+  @DisplayName("injectNoFullTableScanHint: SELECT without alias")
+  void injectHintShouldAddHintToSelectWithoutAlias() {
+    String sql = "SELECT * FROM orders WHERE user_id = ?";
+    String result = ExplainInterceptor.injectNoFullTableScanHint(sql);
+    assertEquals("SELECT /*+ NO_FULL_TABLE_SCAN(orders) */ * FROM orders WHERE user_id = ?", result);
+  }
+
+  @Test
+  @DisplayName("injectNoFullTableScanHint: SELECT with alias")
+  void injectHintShouldUseAliasInSelectWithAlias() {
+    String sql = "SELECT * FROM orders o WHERE o.user_id = ?";
+    String result = ExplainInterceptor.injectNoFullTableScanHint(sql);
+    assertEquals("SELECT /*+ NO_FULL_TABLE_SCAN(o) */ * FROM orders o WHERE o.user_id = ?", result);
+  }
+
+  @Test
+  @DisplayName("injectNoFullTableScanHint: UPDATE")
+  void injectHintShouldAddHintToUpdate() {
+    String sql = "UPDATE orders SET status = ? WHERE id = ?";
+    String result = ExplainInterceptor.injectNoFullTableScanHint(sql);
+    assertEquals("UPDATE /*+ NO_FULL_TABLE_SCAN(orders) */ orders SET status = ? WHERE id = ?", result);
+  }
+
+  @Test
+  @DisplayName("injectNoFullTableScanHint: DELETE")
+  void injectHintShouldAddHintToDelete() {
+    String sql = "DELETE FROM orders WHERE id = ?";
+    String result = ExplainInterceptor.injectNoFullTableScanHint(sql);
+    assertEquals("DELETE /*+ NO_FULL_TABLE_SCAN(orders) */ FROM orders WHERE id = ?", result);
+  }
+
+  @Test
+  @DisplayName("injectNoFullTableScanHint: no FROM clause returns unchanged")
+  void injectHintShouldReturnUnchangedWhenNoFromClause() {
+    String sql = "SELECT 1";
+    assertEquals("SELECT 1", ExplainInterceptor.injectNoFullTableScanHint(sql));
+  }
+
+  @Test
+  @DisplayName("executeExplain: mysql8 databaseId injects NO_FULL_TABLE_SCAN hint")
+  void executeExplainShouldInjectHintForMysql8() throws Exception {
+    Log log = mock(Log.class);
+
+    ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+    when(metaData.getColumnCount()).thenReturn(1);
+
+    ResultSet rs = mock(ResultSet.class);
+    when(rs.next()).thenReturn(true, false);
+    when(rs.getString(1)).thenReturn("Mysql8Plan");
+    when(rs.getMetaData()).thenReturn(metaData);
+
+    PreparedStatement pstmt = mock(PreparedStatement.class);
+    when(pstmt.executeQuery()).thenReturn(rs);
+
+    Connection conn = mock(Connection.class);
+    when(conn.prepareStatement(anyString())).thenReturn(pstmt);
+
+    Executor executor = newMockExecutor(conn);
+
+    Configuration config = sqlSessionFactory.getConfiguration();
+    MappedStatement realMs = config.getMappedStatement("io.github.nakasho.mybatis.explain.selectUser");
+    BoundSql boundSql = realMs.getBoundSql(1);
+
+    MappedStatement ms = cloneMsWithLogAndDatabaseId(realMs, log, "mysql8");
+
+    new ExplainInterceptor().executeExplain(ms, 1, boundSql, executor);
+
+    String originalSql = boundSql.getSql();
+    String expectedSql = "EXPLAIN " + ExplainInterceptor.injectNoFullTableScanHint(originalSql);
+    verify(conn).prepareStatement(expectedSql);
+    verify(log).debug("<== ExplainPlan: Mysql8Plan");
+  }
+
   private static Executor newExecutor(Configuration config) throws SQLException {
     return new SimpleExecutor(config, config.getEnvironment().getTransactionFactory()
         .newTransaction(config.getEnvironment().getDataSource(), null, false));

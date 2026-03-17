@@ -23,7 +23,8 @@ public enum DatabaseType {
 
   DEFAULT("EXPLAIN "),
   ORACLE("EXPLAIN PLAN FOR "),
-  SQL_SERVER(null);
+  SQL_SERVER(null),
+  MYSQL8("EXPLAIN ");
 
   private final String explainPrefix;
 
@@ -38,6 +39,16 @@ public enum DatabaseType {
    */
   public String getExplainPrefix() {
     return explainPrefix;
+  }
+
+  /**
+   * Returns {@code true} if this database type requires {@code NO_FULL_TABLE_SCAN} optimizer hint
+   * injection to ensure index usage is visible even on small datasets.
+   *
+   * @return {@code true} for MySQL 8+, {@code false} otherwise
+   */
+  public boolean isNoFullTableScanRequired() {
+    return this == MYSQL8;
   }
 
   /**
@@ -57,6 +68,9 @@ public enum DatabaseType {
     }
     if ("sqlserver".equals(lower) || "sql server".equals(lower)) {
       return SQL_SERVER;
+    }
+    if ("mysql8".equals(lower)) {
+      return MYSQL8;
     }
     return DEFAULT;
   }

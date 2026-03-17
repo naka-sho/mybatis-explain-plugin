@@ -85,13 +85,47 @@ class DatabaseTypeTest {
   }
 
   @Test
+  @DisplayName("MYSQL8 has 'EXPLAIN ' prefix")
+  void mysql8PrefixShouldBeExplain() {
+    assertEquals("EXPLAIN ", DatabaseType.MYSQL8.getExplainPrefix());
+  }
+
+  @Test
+  @DisplayName("fromDatabaseId: 'mysql8' returns MYSQL8")
+  void fromDatabaseIdMysql8ShouldReturnMysql8() {
+    assertSame(DatabaseType.MYSQL8, DatabaseType.fromDatabaseId("mysql8"));
+  }
+
+  @Test
+  @DisplayName("fromDatabaseId: 'MySQL8' returns MYSQL8 (case-insensitive)")
+  void fromDatabaseIdMysql8MixedCaseShouldReturnMysql8() {
+    assertSame(DatabaseType.MYSQL8, DatabaseType.fromDatabaseId("MySQL8"));
+  }
+
+  @Test
+  @DisplayName("fromDatabaseId: 'mysql' still returns DEFAULT (MySQL 5.x fallback)")
+  void fromDatabaseIdMysqlShouldReturnDefault() {
+    assertSame(DatabaseType.DEFAULT, DatabaseType.fromDatabaseId("mysql"));
+  }
+
+  @Test
+  @DisplayName("isNoFullTableScanRequired: true only for MYSQL8")
+  void isNoFullTableScanRequiredShouldBeTrueOnlyForMysql8() {
+    org.junit.jupiter.api.Assertions.assertTrue(DatabaseType.MYSQL8.isNoFullTableScanRequired());
+    org.junit.jupiter.api.Assertions.assertFalse(DatabaseType.DEFAULT.isNoFullTableScanRequired());
+    org.junit.jupiter.api.Assertions.assertFalse(DatabaseType.ORACLE.isNoFullTableScanRequired());
+    org.junit.jupiter.api.Assertions.assertFalse(DatabaseType.SQL_SERVER.isNoFullTableScanRequired());
+  }
+
+  @Test
   @DisplayName("values() returns all enum constants")
   void valuesShouldReturnAllConstants() {
     DatabaseType[] values = DatabaseType.values();
-    assertEquals(3, values.length);
+    assertEquals(4, values.length);
     assertSame(DatabaseType.DEFAULT, values[0]);
     assertSame(DatabaseType.ORACLE, values[1]);
     assertSame(DatabaseType.SQL_SERVER, values[2]);
+    assertSame(DatabaseType.MYSQL8, values[3]);
   }
 
   @Test
@@ -100,5 +134,6 @@ class DatabaseTypeTest {
     assertSame(DatabaseType.DEFAULT, DatabaseType.valueOf("DEFAULT"));
     assertSame(DatabaseType.ORACLE, DatabaseType.valueOf("ORACLE"));
     assertSame(DatabaseType.SQL_SERVER, DatabaseType.valueOf("SQL_SERVER"));
+    assertSame(DatabaseType.MYSQL8, DatabaseType.valueOf("MYSQL8"));
   }
 }

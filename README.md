@@ -151,6 +151,7 @@ logging:
 |---|---|---|---|---|
 | PostgreSQL | o | `EXPLAIN ` | テキスト（単一カラム） | ツリー形式の実行計画 |
 | MySQL | o | `EXPLAIN ` | テーブル（複数カラム） | `id`, `select_type`, `table`, `type` 等 |
+| MySQL 8+ | o | `EXPLAIN ` | テーブル（複数カラム） | `databaseId=mysql8` で `NO_FULL_TABLE_SCAN` ヒントを自動注入 |
 | MariaDB | o | `EXPLAIN ` | テーブル（複数カラム） | MySQL と同様の形式 |
 | H2 | o | `EXPLAIN ` | テキスト（単一カラム） | 簡易的な実行計画 |
 | SQLite | o | `EXPLAIN ` | バイトコード形式 | `EXPLAIN QUERY PLAN` ではなく `EXPLAIN` を実行 |
@@ -192,6 +193,15 @@ EXPLAIN SELECT * FROM orders WHERE user_id = 1;
 ### MySQL: `FORCE INDEX` / オプティマイザヒント
 
 PostgreSQL の `SET enable_seqscan = off` はセッション全体に適用されますが、**MySQL にはセッション全体で Full Table Scan を禁止する相当の設定はありません**。確認したいクエリごとに個別に指定する必要があります。
+
+本プラグインでは `databaseId=mysql8` を設定することで、EXPLAIN 発行時に `NO_FULL_TABLE_SCAN` ヒントを自動的に注入します。
+
+```yaml
+# mybatis-config.xml または Spring Boot の設定で databaseId を指定
+mybatis:
+  configuration:
+    database-id: mysql8
+```
 
 **`FORCE INDEX` ヒント句**（MySQL 5.x 以降）
 
