@@ -191,7 +191,7 @@ EXPLAIN SELECT * FROM orders WHERE user_id = 1;
 
 ### MySQL: `FORCE INDEX` / オプティマイザヒント
 
-MySQL にはセッション変数で Seq Scan を無効化する直接的な手段はありません。代わりに以下の方法でインデックス使用を強制できます。
+PostgreSQL の `SET enable_seqscan = off` はセッション全体に適用されますが、**MySQL にはセッション全体で Full Table Scan を禁止する相当の設定はありません**。確認したいクエリごとに個別に指定する必要があります。
 
 **`FORCE INDEX` ヒント句**（MySQL 5.x 以降）
 
