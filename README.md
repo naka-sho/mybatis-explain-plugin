@@ -169,6 +169,53 @@ SQL Server など EXPLAIN 非対応の DB では EXPLAIN がスキップされ�
 - クエリ実行後に EXPLAIN を発行するため、1 クエリあたり追加の DB アクセスが 1 回発生します
 - MyBatis のログ実装（`logImpl`）が無効だと `statementLog` が出力されないため、ログ設定を確認してください
 
+## 補足: インデックス動作確認のための DB 設定
+
+EXPLAIN 結果でインデックスが使われているか確認する際に、以下のセッション設定が役立ちます。
+
+### PostgreSQL: `SET enable_seqscan = off`
+
+Seq Scan（全件スキャン）を強制的に無効化し、インデックスが存在する場合に Index Scan を選ばせます。
+
+```sql
+SET enable_seqscan = off;
+EXPLAIN SELECT * FROM orders WHERE user_id = 1;
+```
+
+| 状況 | `enable_seqscan = on`（デフォルト） | `enable_seqscan = off` |
+|---|---|---|
+| インデックスあり・データ少 | Seq Scan（コストが低いため） | Index Scan（インデックスの存在を確認できる） |
+| インデックスなし | Seq Scan | Seq Scan（変わらない） |
+
+> テスト環境など**データ件数が少ない状況でもインデックスの有無を確認したい**ときに有効です。本番環境での使用は不可。
+
+### MySQL: `FORCE INDEX` / オプティマイザヒント
+
+MySQL にはセッション変数で Seq Scan を無効化する直接的な手段はありません。代わりに以下の方法でインデックス使用を強制できます。
+
+**`FORCE INDEX` ヒント句**（MySQL 5.x 以降）
+
+```sql
+EXPLAIN SELECT * FROM orders FORCE INDEX (idx_user_id) WHERE user_id = 1;
+```
+
+インデックス名を明示して強制使用させます。インデックスが存在しない場合はエラーになるため、存在確認にもなります。
+
+**オプティマイザヒント `NO_FULL_TABLE_SCAN`**（MySQL 8.0 以降）
+
+```sql
+EXPLAIN SELECT /*+ NO_FULL_TABLE_SCAN(o) */ * FROM orders o WHERE user_id = 1;
+```
+
+Full Table Scan を禁止し、インデックスがあれば優先して使用させます。PostgreSQL の `enable_seqscan = off` に最も近い動作です。
+
+| 方法 | バージョン | 動作 |
+|---|---|---|
+| `FORCE INDEX (idx)` | 5.x 以降 | 指定インデックスを強制使用。インデックスがなければエラー |
+| `/*+ NO_FULL_TABLE_SCAN(alias) */` | 8.0 以降 | Full Table Scan を禁止。インデックスがなければエラー |
+
+> これらはクエリ単位の制御です。本番クエリに混入しないよう開発環境専用として管理してください。
+
 ## ビルド
 
 ```bash
